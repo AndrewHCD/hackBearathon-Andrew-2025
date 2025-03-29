@@ -24,6 +24,10 @@ two_finger_done = False
 one_fingers_detected = False
 one_finger_done = False
 
+# Variables to store wrist positions when two fingers are detected
+bottom_left_wrist = None
+bottom_right_wrist = None
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -43,6 +47,7 @@ while cap.isOpened():
     face_x = None        # Store face X position
     face_y = None        # Store face Y position
     
+    # sets both one finger and two finger to false at the start
     left_hand_two_fingers = False
     right_hand_two_fingers = False
     left_hand_one_fingers = False
@@ -113,6 +118,20 @@ while cap.isOpened():
         two_finger_done = True  # Remember that two fingers were detected
         right_hand_two_fingers = False
         left_hand_two_fingers = False
+        # Store wrist positions
+        bottom_left_wrist = (left_hand_x, left_hand_y)
+        bottom_right_wrist = (right_hand_x, right_hand_y)
+
+    # Draw blue dots at stored wrist positions this will be used to record bottom of the rep compared to top
+    if bottom_left_wrist:
+        cv2.circle(frame, bottom_left_wrist, 10, (255, 0, 0), -1)  # Blue dot
+        cv2.putText(frame, "Lowest Point", (bottom_left_wrist[0] - 40, bottom_left_wrist[1] + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)  # Text below dot
+
+    if bottom_right_wrist:
+        cv2.circle(frame, bottom_right_wrist, 10, (255, 0, 0), -1)  # Blue dot
+        cv2.putText(frame, "Lowest Point", (bottom_right_wrist[0] - 40, bottom_right_wrist[1] + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)  # Text below do
 
     if two_finger_done and left_hand_one_fingers and right_hand_one_fingers:
         one_fingers_detected = True
