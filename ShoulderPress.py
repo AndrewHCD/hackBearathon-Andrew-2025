@@ -6,8 +6,10 @@ mp_hands = mp.solutions.hands
 mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 
+# intialize hands and face detection and pose which will be used to track forearms
 hands = mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
+
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
@@ -24,9 +26,15 @@ two_finger_done = False
 one_fingers_detected = False
 one_finger_done = False
 
-# Variables to store wrist positions when two fingers are detected
+# Variables to store wrist positions when two fingers are detected at the bottom
 bottom_left_wrist = None
 bottom_right_wrist = None
+
+# Variables to store wrist positions for highest point
+top_left_wrist = None # testing
+top_right_wrist = None # testing
+activate_highest_point = False
+
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -88,10 +96,12 @@ while cap.isOpened():
                 left_hand_x = int(wrist.x * w)  # Convert to pixel coordinates
                 left_hand_y = int(wrist.y * h)  # Get Y coordinate too
                 
+                 
                 # if two fingers are raised changes it two_fingers_up
                 if two_finger_done == False:
                     left_hand_two_fingers = two_fingers_up
                     two_fingers_up = True
+                        
                 if two_finger_done == True:
                     left_hand_one_fingers = one_finger_up
                     
@@ -99,14 +109,14 @@ while cap.isOpened():
                 right_hand_x = int(wrist.x * w)  # Convert to pixel coordinates
                 right_hand_y = int(wrist.y * h)  # Get Y coordinate too
                 
+                
                 # if two fingers are raised changes it two_fingers_up
                 if two_finger_done == False:
                     right_hand_two_fingers = two_fingers_up
                     two_fingers_up = True
+    
                 if two_finger_done == True:
                     right_hand_one_fingers = one_finger_up
-
-                
 
             # Draw landmarks on hands
             mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
@@ -114,14 +124,22 @@ while cap.isOpened():
     # Update the "two_fingers_detected" status only if both hands have two fingers up
     # Track the state of finger detection
     if left_hand_two_fingers and right_hand_two_fingers and not two_finger_done:
-        two_fingers_detected = True
-        two_finger_done = True  # Remember that two fingers were detected
-        right_hand_two_fingers = False
-        left_hand_two_fingers = False
-        # Store wrist positions
-        bottom_left_wrist = (left_hand_x, left_hand_y)
-        bottom_right_wrist = (right_hand_x, right_hand_y)
-
+    
+        if activate_highest_point == False:
+            top_right_wrist = (right_hand_x, right_hand_y)  # testing
+            top_left_wrist = (left_hand_x, left_hand_y) # testing
+            
+        if activate_highest_point == True:   
+            two_fingers_detected = True
+            two_finger_done = True  # Remember that two fingers were detected
+            activate_highest_point = True
+            right_hand_two_fingers = False
+            left_hand_two_fingers = False
+            # Store wrist positions
+            bottom_left_wrist = (left_hand_x, left_hand_y)
+            bottom_right_wrist = (right_hand_x, right_hand_y)
+            
+        
     # Draw blue dots at stored wrist positions this will be used to record bottom of the rep compared to top
     if bottom_left_wrist:
         cv2.circle(frame, bottom_left_wrist, 10, (255, 0, 0), -1)  # Blue dot
@@ -132,6 +150,17 @@ while cap.isOpened():
         cv2.circle(frame, bottom_right_wrist, 10, (255, 0, 0), -1)  # Blue dot
         cv2.putText(frame, "Lowest Point", (bottom_right_wrist[0] - 40, bottom_right_wrist[1] + 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)  # Text below do
+        
+    # Draw red dots at the highest wrist positions
+    if top_left_wrist: # testing
+        cv2.circle(frame, top_left_wrist, 10, (0, 0, 255), -1)  # Red dot for highest point  # testing
+        cv2.putText(frame, "Highest Point", (top_left_wrist[0] - 40, top_left_wrist[1] - 20),  # testing
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)  # Text above dot  # testing
+
+    if top_right_wrist:
+        cv2.circle(frame, top_right_wrist, 10, (0, 0, 255), -1)  # Red dot for highest point  # testing
+        cv2.putText(frame, "Highest Point", (top_right_wrist[0] - 40, top_right_wrist[1] - 20),  # testing
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)  # Text above dot  # testing
 
     if two_finger_done and left_hand_one_fingers and right_hand_one_fingers:
         one_fingers_detected = True
