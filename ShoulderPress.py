@@ -18,6 +18,11 @@ if not cap.isOpened():
 
 # Variable to store the status of "two fingers raised"
 two_fingers_detected = False
+two_finger_done = False
+
+# varible to store the status of one finger raised
+one_fingers_detected = False
+one_finger_done = False
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -40,6 +45,8 @@ while cap.isOpened():
     
     left_hand_two_fingers = False
     right_hand_two_fingers = False
+    left_hand_one_fingers = False
+    right_hand_one_fingers = False
 
     # Detect hands
     hand_results = hands.process(frame_rgb)
@@ -60,29 +67,63 @@ while cap.isOpened():
             # Check if index and middle fingers are up (y position lower than other fingers)
             index_up = index_tip < hand_landmarks.landmark[6].y  # Index finger up
             middle_up = middle_tip < hand_landmarks.landmark[10].y  # Middle finger up
+    
             ring_down = ring_tip > hand_landmarks.landmark[14].y  # Ring finger down
             pinky_down = pinky_tip > hand_landmarks.landmark[18].y  # Pinky finger down
             
+            # used for 1 finger up
+            middle_down = middle_tip > hand_landmarks.landmark[10].y  # Middle finger down
+            
+            # if two fingers are up these are the conditions
             two_fingers_up = index_up and middle_up and ring_down and pinky_down
+            # if 1 finger is up these are the conditions 
+            one_finger_up = index_up and middle_down and ring_down and pinky_down
             
             if label == "Left":
                 left_hand_x = int(wrist.x * w)  # Convert to pixel coordinates
                 left_hand_y = int(wrist.y * h)  # Get Y coordinate too
-                left_hand_two_fingers = two_fingers_up
+                
+                # if two fingers are raised changes it two_fingers_up
+                if two_finger_done == False:
+                    left_hand_two_fingers = two_fingers_up
+                    two_fingers_up = True
+                if two_finger_done == True:
+                    left_hand_one_fingers = one_finger_up
+                    
             elif label == "Right":
                 right_hand_x = int(wrist.x * w)  # Convert to pixel coordinates
                 right_hand_y = int(wrist.y * h)  # Get Y coordinate too
-                right_hand_two_fingers = two_fingers_up
+                
+                # if two fingers are raised changes it two_fingers_up
+                if two_finger_done == False:
+                    right_hand_two_fingers = two_fingers_up
+                    two_fingers_up = True
+                if two_finger_done == True:
+                    right_hand_one_fingers = one_finger_up
+
+                
 
             # Draw landmarks on hands
             mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
     # Update the "two_fingers_detected" status only if both hands have two fingers up
-    if left_hand_two_fingers and right_hand_two_fingers:
+    # Track the state of finger detection
+    if left_hand_two_fingers and right_hand_two_fingers and not two_finger_done:
         two_fingers_detected = True
+        two_finger_done = True  # Remember that two fingers were detected
+        right_hand_two_fingers = False
+        left_hand_two_fingers = False
 
-    # Check if the two fingers are detected and update status text
-    if two_fingers_detected:
+    if two_finger_done and left_hand_one_fingers and right_hand_one_fingers:
+        one_fingers_detected = True
+        one_finger_done = True  # Remember that one finger was detected
+        two_finger_done = False  # Reset two fingers state
+
+    # Update status message based on detection
+    if one_finger_done:
+        status_text = "Completed"
+        status_color = (0, 255, 0)  # Green
+    elif two_fingers_detected:
         status_text = "Two fingers detected on both hands!"
         status_color = (0, 255, 0)  # Green
     else:
