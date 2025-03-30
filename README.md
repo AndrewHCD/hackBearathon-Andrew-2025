@@ -147,7 +147,9 @@ After completing the workout, review your saved video in the recorded_videos dir
 
 **Directory Structure**
 text
+
 project/
+
 ├── shoulder_press_analyzer.py  # Main script
 
 ├── recorded_videos/            # Directory where videos are saved
