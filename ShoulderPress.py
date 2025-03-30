@@ -1,6 +1,13 @@
 import cv2
 import mediapipe as mp
 import time  # Import time module to track delays
+import os
+from datetime import datetime
+
+# Create directory for saving videos if it doesn't exist
+output_dir = "recorded_videos"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
 # Initialize MediaPipe Hands & Face Detection
 mp_hands = mp.solutions.hands
@@ -17,6 +24,14 @@ cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     print("Error: Could not access the webcam.")
     exit()
+
+# Get webcam properties for video writer
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+# Video writer setup (will be initialized when recording starts)
+video_writer = None
 
 # State variables for the workflow
 highest_point_set = False  # First step: set highest point with one finger
@@ -93,7 +108,7 @@ while cap.isOpened():
     # Update elapsed time if set is in progress
     if started and not completed and set_start_time is not None:
         elapsed_time = current_time - set_start_time
-
+        
     # Only process detection if not in completed state
     if not completed:
         # Detect hands
@@ -176,6 +191,13 @@ while cap.isOpened():
         unbalanced_hands_start = None
         currently_uneven_height = False
         currently_unbalanced_hands = False
+        
+        # Initialize video writer when set starts
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_filename = os.path.join(output_dir, f"workout_{timestamp}.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use mp4v codec
+        video_writer = cv2.VideoWriter(video_filename, fourcc, fps, (frame_width, frame_height))
+        print(f"Recording started: {video_filename}")
     
     # Step 3: Mark as completed with one finger on both hands
     if started and not completed and left_hand_one_finger and right_hand_one_finger:
@@ -195,6 +217,12 @@ while cap.isOpened():
             unbalanced_hands_timer += (current_time - unbalanced_hands_start)
             currently_unbalanced_hands = False
             unbalanced_hands_start = None
+            
+        # Stop video recording when completed
+        if video_writer is not None:
+            video_writer.release()
+            print(f"Recording saved to {video_filename}")
+            video_writer = None
     
     # Count repetitions when activity is in progress and not completed
     if started and not completed and left_hand_x is not None and right_hand_x is not None:
@@ -403,6 +431,12 @@ while cap.isOpened():
         # Display the time below the status text (properly centered)
         cv2.putText(frame, time_text, (w//2 - time_text_size[0]//2, 60), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    
+    # Display recording status if currently recording
+    if started and not completed and video_writer is not None:
+        recording_text = "● REC"
+        cv2.putText(frame, recording_text, (w - 100, 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)  # Red dot for recording
 
     # Calculate total completed reps (minimum of top and bottom counts)
     # This ensures that a rep is only counted if both top and bottom positions were reached
@@ -482,12 +516,20 @@ while cap.isOpened():
 
     # Show the frame
     cv2.imshow("Shoulder Press Analyzer", frame)
+    
+    # Write frame to video if recording is active
+    if started and not completed and video_writer is not None:
+        video_writer.write(frame)
 
     # Close window when 'q' is pressed or if manually closed
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
     if cv2.getWindowProperty("Shoulder Press Analyzer", cv2.WND_PROP_VISIBLE) < 1:
         break
+
+# Make sure to release the video writer if it's still active
+if video_writer is not None:
+    video_writer.release()
 
 cap.release()
 cv2.destroyAllWindows()
