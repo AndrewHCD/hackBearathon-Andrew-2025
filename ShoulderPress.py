@@ -371,6 +371,41 @@ while cap.isOpened():
                     cv2.putText(frame, balanced_info, (w//4 - 200, h - 30), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                     
+                    # testing
+        if not started and left_hand_x is not None and face_x is not None and right_hand_x is not None:
+            left_distance = abs(left_hand_x - face_x)
+            right_distance = abs(right_hand_x - face_x)
+            difference = abs(left_distance - right_distance)
+            
+            # Check if hands are unbalanced
+            if difference > 30:
+                warning_text = f"UNBALANCED HANDS: {difference}px"
+                warning_color = (0, 0, 255)  # Red
+                
+                # Draw the warning at the bottom of the screen
+                text_size = cv2.getTextSize(warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+                cv2.putText(frame, warning_text, (w//4 - text_size[0]//2, h - 30), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, warning_color, 2)
+                
+                  #    testing
+        # Check for uneven heights DURING SETUP PHASES ONLY
+        if not started and left_hand_y is not None and right_hand_y is not None:
+            # Calculate vertical distances from bottom of frame
+            left_from_bottom = h - left_hand_y
+            right_from_bottom = h - right_hand_y
+            vertical_difference = abs(left_from_bottom - right_from_bottom)
+            
+            if vertical_difference > 30:
+                vertical_warning_text = f"UNEVEN HEIGHT: {vertical_difference}px"
+                vertical_warning_color = (0, 0, 255)  # Red
+                
+                # Draw the warning at the bottom of the screen, above the previous warning if present
+                text_size = cv2.getTextSize(vertical_warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+                cv2.putText(frame, vertical_warning_text, (w//4 - text_size[0]//2, h - 60), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, vertical_warning_color, 2)
+        
+        
+                     
         # Check and update timers for uneven heights - ONLY IF SET HAS STARTED
         if started and left_hand_y is not None and right_hand_y is not None:
             # Calculate vertical distances from bottom of frame
