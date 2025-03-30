@@ -47,8 +47,20 @@ last_bottom_time = 0
 # Minimum delay required between counts (in seconds)
 min_delay = 1.5
 
+# Timer variables for tracking set duration
+set_start_time = None  # Will store when the set was started
+elapsed_time = 0  # Will track elapsed time during the set
+
 # Threshold for how close the hand needs to be to count as a rep (in pixels)
 proximity_threshold = 20
+
+# NEW: Timer variables for tracking uneven hands and unbalanced height
+uneven_height_timer = 0  # Total accumulated time with uneven height
+unbalanced_hands_timer = 0  # Total accumulated time with unbalanced hands
+uneven_height_start = None  # Will store when uneven height was first detected
+unbalanced_hands_start = None  # Will store when unbalanced hands were first detected
+currently_uneven_height = False  # Flag for tracking current state
+currently_unbalanced_hands = False  # Flag for tracking current state
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -77,6 +89,10 @@ while cap.isOpened():
 
     # Get current time for delay calculations
     current_time = time.time()
+    
+    # Update elapsed time if set is in progress
+    if started and not completed and set_start_time is not None:
+        elapsed_time = current_time - set_start_time
 
     # Only process detection if not in completed state
     if not completed:
@@ -151,10 +167,34 @@ while cap.isOpened():
         # Initialize the time trackers
         last_top_time = 0
         last_bottom_time = 0
+        # Start the set timer
+        set_start_time = time.time()
+        # Reset uneven timers when starting
+        uneven_height_timer = 0
+        unbalanced_hands_timer = 0
+        uneven_height_start = None
+        unbalanced_hands_start = None
+        currently_uneven_height = False
+        currently_unbalanced_hands = False
     
     # Step 3: Mark as completed with one finger on both hands
     if started and not completed and left_hand_one_finger and right_hand_one_finger:
         completed = True
+        # Freeze the elapsed time at completion
+        if set_start_time is not None:
+            elapsed_time = current_time - set_start_time
+            set_start_time = None  # Clear start time
+        
+        # If any uneven states are active, add their final durations
+        if currently_uneven_height and uneven_height_start is not None:
+            uneven_height_timer += (current_time - uneven_height_start)
+            currently_uneven_height = False
+            uneven_height_start = None
+            
+        if currently_unbalanced_hands and unbalanced_hands_start is not None:
+            unbalanced_hands_timer += (current_time - unbalanced_hands_start)
+            currently_unbalanced_hands = False
+            unbalanced_hands_start = None
     
     # Count repetitions when activity is in progress and not completed
     if started and not completed and left_hand_x is not None and right_hand_x is not None:
@@ -241,21 +281,48 @@ while cap.isOpened():
             cv2.putText(frame, f"R: {right_distance}px", (mid_x, mid_y - 100), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
 
-        # Display warning when hand distances are unbalanced only if not completed
+        # Check and update timers for unbalanced hands
         if left_hand_x is not None and face_x is not None and right_hand_x is not None:
             left_distance = abs(left_hand_x - face_x)
             right_distance = abs(right_hand_x - face_x)
             difference = abs(left_distance - right_distance)
+            
+            # Check if hands are unbalanced
             if difference > 30:
                 warning_text = f"UNBALANCED HANDS: {difference}px difference"
                 warning_color = (0, 0, 255)  # Red
+                
+                # If this is the first time we're detecting unbalanced hands, start the timer
+                if not currently_unbalanced_hands:
+                    unbalanced_hands_start = current_time
+                    currently_unbalanced_hands = True
+                
+                # Calculate current unbalanced duration
+                current_unbalanced_duration = current_time - unbalanced_hands_start
+                total_unbalanced_time = unbalanced_hands_timer + current_unbalanced_duration
+                
+                # Add duration to the warning text
+                warning_text += f" - Time: {total_unbalanced_time:.1f}s"
+                
                 # Draw the warning at the bottom of the screen
-                # Add a background to make text more visible
                 text_size = cv2.getTextSize(warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-                cv2.putText(frame, warning_text, (w//2 - 200, h - 30), 
+                cv2.putText(frame, warning_text, (w//2 - text_size[0]//2, h - 30), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, warning_color, 2)
+            else:
+                # If hands are now balanced but were unbalanced before, update the timer
+                if currently_unbalanced_hands:
+                    unbalanced_hands_timer += (current_time - unbalanced_hands_start)
+                    currently_unbalanced_hands = False
+                    
+                # Display the total time even when balanced
+                if unbalanced_hands_timer > 0 or currently_unbalanced_hands:
+                    balanced_info = f"Total Unbalanced Hands Time: {unbalanced_hands_timer:.1f}s"
+                    cv2.putText(frame, balanced_info, (w//2 - 200, h - 30), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                    
+        # Check and update timers for uneven heights
         if left_hand_y is not None and right_hand_y is not None:
-        # Calculate vertical distances from bottom of frame
+            # Calculate vertical distances from bottom of frame
             left_from_bottom = h - left_hand_y
             right_from_bottom = h - right_hand_y
             vertical_difference = abs(left_from_bottom - right_from_bottom)
@@ -264,10 +331,33 @@ while cap.isOpened():
                 vertical_warning_text = f"UNEVEN HEIGHT: {vertical_difference}px difference"
                 vertical_warning_color = (0, 0, 255)  # Red
                 
+                # If this is the first time we're detecting uneven height, start the timer
+                if not currently_uneven_height:
+                    uneven_height_start = current_time
+                    currently_uneven_height = True
+                
+                # Calculate current uneven duration
+                current_uneven_duration = current_time - uneven_height_start
+                total_uneven_time = uneven_height_timer + current_uneven_duration
+                
+                # Add duration to the warning text
+                vertical_warning_text += f" - Time: {total_uneven_time:.1f}s"
+                
                 # Draw the warning at the bottom of the screen, above the previous warning if present
                 text_size = cv2.getTextSize(vertical_warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-                cv2.putText(frame, vertical_warning_text, (w//2 - 200, h - 60), 
+                cv2.putText(frame, vertical_warning_text, (w//2 - text_size[0]//2, h - 60), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, vertical_warning_color, 2)
+            else:
+                # If heights are now even but were uneven before, update the timer
+                if currently_uneven_height:
+                    uneven_height_timer += (current_time - uneven_height_start)
+                    currently_uneven_height = False
+                
+                # Display the total time even when even
+                if uneven_height_timer > 0 or currently_uneven_height:
+                    even_info = f"Total Uneven Height Time: {uneven_height_timer:.1f}s"
+                    cv2.putText(frame, even_info, (w//2 - 200, h - 60), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
     # Update status text based on the current state
     if completed:
@@ -300,6 +390,20 @@ while cap.isOpened():
     cv2.putText(frame, status_text, (w//2 - text_size[0]//2, 30), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
 
+    # Display timer below the status text
+    if started or completed:
+        # Format time as minutes:seconds
+        minutes = int(elapsed_time // 60)
+        seconds = int(elapsed_time % 60)
+        time_text = f"Time: {minutes:02d}:{seconds:02d}"
+        
+        # Calculate text width to center it properly
+        time_text_size = cv2.getTextSize(time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+        
+        # Display the time below the status text (properly centered)
+        cv2.putText(frame, time_text, (w//2 - time_text_size[0]//2, 60), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
     # Calculate total completed reps (minimum of top and bottom counts)
     # This ensures that a rep is only counted if both top and bottom positions were reached
     total_reps = min(top_count, bottom_count)
@@ -324,7 +428,6 @@ while cap.isOpened():
         # Bottom count background
         bottom_text = f"BOTTOM: {bottom_count}"
         bottom_text_size = cv2.getTextSize(bottom_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-       
         
         # Draw bottom count
         cv2.putText(
@@ -337,20 +440,43 @@ while cap.isOpened():
             2,
         )
         
-        # If completed, show total reps at the bottom of the screen
+        # If completed, show total reps and uneven time statistics at the bottom of the screen
         if completed:
             total_text = f"TOTAL COMPLETED REPS: {total_reps}"
             total_text_size = cv2.getTextSize(total_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-    
             
             # Draw total reps text
             cv2.putText(
                 frame,
                 total_text,
-                (w//2 - total_text_size[0]//2, h - 30),  # Centered at bottom
+                (w//2 - total_text_size[0]//2, h - 120),  # Centered at bottom
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,
-                (0, 0, 0),  #Black
+                (0, 0, 0),  # Black
+                2,
+            )
+            
+            # Display uneven timing statistics
+            uneven_height_text = f"Total Time with Uneven Height: {uneven_height_timer:.1f} seconds"
+            uneven_hands_text = f"Total Time with Unbalanced Hands: {unbalanced_hands_timer:.1f} seconds"
+            
+            cv2.putText(
+                frame,
+                uneven_height_text,
+                (w//2 - 250, h - 80),  # Position above total reps
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 0, 255),  # Red
+                2,
+            )
+            
+            cv2.putText(
+                frame,
+                uneven_hands_text,
+                (w//2 - 250, h - 40),  # Position above total reps
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 0, 255),  # Red
                 2,
             )
 
