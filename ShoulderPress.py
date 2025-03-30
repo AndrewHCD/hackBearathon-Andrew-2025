@@ -281,8 +281,8 @@ while cap.isOpened():
             cv2.putText(frame, f"R: {right_distance}px", (mid_x, mid_y - 100), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
 
-        # Check and update timers for unbalanced hands
-        if left_hand_x is not None and face_x is not None and right_hand_x is not None:
+        # Check and update timers for unbalanced hands - ONLY IF SET HAS STARTED
+        if started and left_hand_x is not None and face_x is not None and right_hand_x is not None:
             left_distance = abs(left_hand_x - face_x)
             right_distance = abs(right_hand_x - face_x)
             difference = abs(left_distance - right_distance)
@@ -320,8 +320,8 @@ while cap.isOpened():
                     cv2.putText(frame, balanced_info, (w//2 - 200, h - 30), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                     
-        # Check and update timers for uneven heights
-        if left_hand_y is not None and right_hand_y is not None:
+        # Check and update timers for uneven heights - ONLY IF SET HAS STARTED
+        if started and left_hand_y is not None and right_hand_y is not None:
             # Calculate vertical distances from bottom of frame
             left_from_bottom = h - left_hand_y
             right_from_bottom = h - right_hand_y
