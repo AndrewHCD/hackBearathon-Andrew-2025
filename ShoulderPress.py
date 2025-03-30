@@ -3,6 +3,7 @@ import mediapipe as mp
 import time  # Import time module to track delays
 import os
 from datetime import datetime
+import numpy as np
 
 # Create directory for saving videos if it doesn't exist
 output_dir = "recorded_videos"
@@ -29,6 +30,16 @@ if not cap.isOpened():
 frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+
+# testing
+# Create an extended frame with space for data on the right
+extended_width = frame_width * 2  # Double the width to add black space on right
+extended_height = frame_height
+# Update the video writer dimensions
+frame_width = extended_width
+
+
 
 # Video writer setup (will be initialized when recording starts)
 video_writer = None
@@ -87,6 +98,17 @@ while cap.isOpened():
     if not ret:
         print("Error: Failed to capture image.")
         break
+    
+    
+    # testing
+    # Create the extended frame with black space on the right
+    extended_frame = np.zeros((extended_height, extended_width, 3), dtype=np.uint8)
+    # Place the original frame on the left side
+    extended_frame[0:frame.shape[0], 0:frame.shape[1]] = frame
+    # Use the extended frame for all further operations
+    frame = extended_frame
+    
+    
 
     # Mirror the frame horizontally
     frame = cv2.flip(frame, 1)
@@ -297,9 +319,9 @@ while cap.isOpened():
         if left_hand_x is not None and face_x is not None:
             left_distance = abs(left_hand_x - face_x)
             cv2.line(frame, (left_hand_x, left_hand_y), (face_x, face_y), (0, 255, 0), 2)
-            mid_x = (left_hand_x + face_x) // 4
+            mid_x = (left_hand_x + face_x) // 2
             mid_y = (left_hand_y + face_y) // 2
-            cv2.putText(frame, f"L: {left_distance}px", (mid_x, mid_y - 100), 
+            cv2.putText(frame, f"L: {left_distance}px", (mid_x, mid_y - 150), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
         if right_hand_x is not None and face_x is not None:
@@ -307,7 +329,7 @@ while cap.isOpened():
             cv2.line(frame, (right_hand_x, right_hand_y), (face_x, face_y), (255, 0, 0), 2)
             mid_x = (right_hand_x + face_x) // 2
             mid_y = (right_hand_y + face_y) // 2
-            cv2.putText(frame, f"R: {right_distance}px", (mid_x, mid_y - 100), 
+            cv2.putText(frame, f"R: {right_distance}px", (mid_x, mid_y - 150), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
 
         # Check and update timers for unbalanced hands - ONLY IF SET HAS STARTED
@@ -318,7 +340,7 @@ while cap.isOpened():
             
             # Check if hands are unbalanced
             if difference > 30:
-                warning_text = f"UNBALANCED HANDS: {difference}px difference"
+                warning_text = f"UNBALANCED HANDS: {difference}px"
                 warning_color = (0, 0, 255)  # Red
                 
                 # If this is the first time we're detecting unbalanced hands, start the timer
@@ -335,7 +357,7 @@ while cap.isOpened():
                 
                 # Draw the warning at the bottom of the screen
                 text_size = cv2.getTextSize(warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-                cv2.putText(frame, warning_text, (w//2 - text_size[0]//2, h - 30), 
+                cv2.putText(frame, warning_text, (w//4 - text_size[0]//2, h - 30), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, warning_color, 2)
             else:
                 # If hands are now balanced but were unbalanced before, update the timer
@@ -346,7 +368,7 @@ while cap.isOpened():
                 # Display the total time even when balanced
                 if unbalanced_hands_timer > 0 or currently_unbalanced_hands:
                     balanced_info = f"Total Unbalanced Hands Time: {unbalanced_hands_timer:.1f}s"
-                    cv2.putText(frame, balanced_info, (w//2 - 200, h - 30), 
+                    cv2.putText(frame, balanced_info, (w//4 - 200, h - 30), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                     
         # Check and update timers for uneven heights - ONLY IF SET HAS STARTED
@@ -357,7 +379,7 @@ while cap.isOpened():
             vertical_difference = abs(left_from_bottom - right_from_bottom)
             
             if vertical_difference > 30:
-                vertical_warning_text = f"UNEVEN HEIGHT: {vertical_difference}px difference"
+                vertical_warning_text = f"UNEVEN HEIGHT: {vertical_difference}px"
                 vertical_warning_color = (0, 0, 255)  # Red
                 
                 # If this is the first time we're detecting uneven height, start the timer
@@ -374,7 +396,7 @@ while cap.isOpened():
                 
                 # Draw the warning at the bottom of the screen, above the previous warning if present
                 text_size = cv2.getTextSize(vertical_warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
-                cv2.putText(frame, vertical_warning_text, (w//2 - text_size[0]//2, h - 60), 
+                cv2.putText(frame, vertical_warning_text, (w//4 - text_size[0]//2, h - 60), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, vertical_warning_color, 2)
             else:
                 # If heights are now even but were uneven before, update the timer
@@ -385,7 +407,7 @@ while cap.isOpened():
                 # Display the total time even when even
                 if uneven_height_timer > 0 or currently_uneven_height:
                     even_info = f"Total Uneven Height Time: {uneven_height_timer:.1f}s"
-                    cv2.putText(frame, even_info, (w//2 - 200, h - 60), 
+                    cv2.putText(frame, even_info, (w//4 - 200, h - 60), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
     # Update status text based on the current state
@@ -416,7 +438,7 @@ while cap.isOpened():
     text_size = cv2.getTextSize(status_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
     
     # Display status at the top of the screen
-    cv2.putText(frame, status_text, (w//2 - text_size[0]//2, 30), 
+    cv2.putText(frame, status_text, (w//4 - text_size[0]//2, 30), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
 
     # Display timer below the status text
@@ -424,13 +446,14 @@ while cap.isOpened():
         # Format time as minutes:seconds
         minutes = int(elapsed_time // 60)
         seconds = int(elapsed_time % 60)
-        time_text = f"Time: {minutes:02d}:{seconds:02d}"
+        milliseconds = int((elapsed_time * 1000) % 1000)
+        time_text = f"Time: {minutes:02d}:{seconds:02d}.{milliseconds:03d} "
         
         # Calculate text width to center it properly
         time_text_size = cv2.getTextSize(time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
         
         # Display the time below the status text (properly centered)
-        cv2.putText(frame, time_text, (w//2 - time_text_size[0]//2, 60), 
+        cv2.putText(frame, time_text, (w//4 - time_text_size[0]//2, 60), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     
     # Display recording status if currently recording
@@ -484,10 +507,10 @@ while cap.isOpened():
             cv2.putText(
                 frame,
                 total_text,
-                (w//2 - total_text_size[0]//2, h - 120),  # Centered at bottom
+                (w//4 - total_text_size[0]//2, h - 120),  # Centered at bottom
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,
-                (0, 0, 0),  # Black
+                (255,255,255),  #WHITE
                 2,
             )
             
@@ -498,7 +521,7 @@ while cap.isOpened():
             cv2.putText(
                 frame,
                 uneven_height_text,
-                (w//2 - 250, h - 80),  # Position above total reps
+                (w//4 - 250, h - 80),  # Position above total reps
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
                 (0, 0, 255),  # Red
@@ -508,7 +531,7 @@ while cap.isOpened():
             cv2.putText(
                 frame,
                 uneven_hands_text,
-                (w//2 - 250, h - 40),  # Position above total reps
+                (w//4 - 250, h - 40),  # Position above total reps
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
                 (0, 0, 255),  # Red
