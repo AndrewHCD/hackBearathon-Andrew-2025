@@ -87,15 +87,24 @@ After completing the workout, review your saved video in the recorded_videos dir
 text
 project/
 ├── shoulder_press_analyzer.py  # Main script
+
 ├── recorded_videos/            # Directory where videos are saved
+
 └── README.md                   # Documentation file
 
 **Troubleshooting**
 Common Issues
+
 Webcam Not Detected:
+
 Ensure your webcam is connected properly.
+
 Check if another application is using the webcam.
+
 Ensure your hands are clearly visible to the webcam.
+
 Avoid excessive background clutter.
+
 Video Not Saving:
+
 Ensure you have write permissions for the recorded_videos directory.
