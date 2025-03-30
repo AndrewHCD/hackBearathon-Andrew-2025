@@ -254,6 +254,20 @@ while cap.isOpened():
                 text_size = cv2.getTextSize(warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
                 cv2.putText(frame, warning_text, (w//2 - 200, h - 30), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, warning_color, 2)
+        if left_hand_y is not None and right_hand_y is not None:
+        # Calculate vertical distances from bottom of frame
+            left_from_bottom = h - left_hand_y
+            right_from_bottom = h - right_hand_y
+            vertical_difference = abs(left_from_bottom - right_from_bottom)
+            
+            if vertical_difference > 30:
+                vertical_warning_text = f"UNEVEN HEIGHT: {vertical_difference}px difference"
+                vertical_warning_color = (0, 0, 255)  # Red
+                
+                # Draw the warning at the bottom of the screen, above the previous warning if present
+                text_size = cv2.getTextSize(vertical_warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+                cv2.putText(frame, vertical_warning_text, (w//2 - 200, h - 60), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, vertical_warning_color, 2)
 
     # Update status text based on the current state
     if completed:
@@ -336,7 +350,7 @@ while cap.isOpened():
                 (w//2 - total_text_size[0]//2, h - 30),  # Centered at bottom
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,
-                (0, 0, 0),  # Black
+                (0, 0, 0),  #Black
                 2,
             )
 
