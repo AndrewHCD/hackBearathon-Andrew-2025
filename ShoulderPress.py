@@ -28,6 +28,18 @@ top_right_wrist = None
 bottom_left_wrist = None
 bottom_right_wrist = None
 
+# Variables to track repetition counts
+top_count = 0
+bottom_count = 0
+
+# Variables to track if we've recently counted a rep
+# This prevents counting the same position multiple times
+at_top_position = False
+at_bottom_position = False
+
+# Threshold for how close the hand needs to be to count as a rep (in pixels)
+proximity_threshold = 20
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -112,6 +124,40 @@ while cap.isOpened():
     if started and not completed and left_hand_one_finger and right_hand_one_finger:
         completed = True
     
+    # Count repetitions when activity is in progress
+    if started and not completed and left_hand_x is not None and right_hand_x is not None:
+        # Calculate distance to top position
+        left_to_top_distance = None
+        right_to_top_distance = None
+        if top_left_wrist and top_right_wrist:
+            left_to_top_distance = ((left_hand_x - top_left_wrist[0])**2 + (left_hand_y - top_left_wrist[1])**2)**0.5
+            right_to_top_distance = ((right_hand_x - top_right_wrist[0])**2 + (right_hand_y - top_right_wrist[1])**2)**0.5
+        
+        # Calculate distance to bottom position
+        left_to_bottom_distance = None
+        right_to_bottom_distance = None
+        if bottom_left_wrist and bottom_right_wrist:
+            left_to_bottom_distance = ((left_hand_x - bottom_left_wrist[0])**2 + (left_hand_y - bottom_left_wrist[1])**2)**0.5
+            right_to_bottom_distance = ((right_hand_x - bottom_right_wrist[0])**2 + (right_hand_y - bottom_right_wrist[1])**2)**0.5
+        
+        # Check if hands are close to top position
+        if left_to_top_distance is not None and right_to_top_distance is not None:
+            if left_to_top_distance < proximity_threshold and right_to_top_distance < proximity_threshold:
+                if not at_top_position:  # Only count once when reaching the position
+                    top_count += 1
+                    at_top_position = True
+            else:
+                at_top_position = False
+        
+        # Check if hands are close to bottom position
+        if left_to_bottom_distance is not None and right_to_bottom_distance is not None:
+            if left_to_bottom_distance < proximity_threshold and right_to_bottom_distance < proximity_threshold:
+                if not at_bottom_position:  # Only count once when reaching the position
+                    bottom_count += 1
+                    at_bottom_position = True
+            else:
+                at_bottom_position = False
+    
     # Draw markers for highest and lowest points
     if top_left_wrist:
         cv2.circle(frame, top_left_wrist, 10, (0, 0, 255), -1)  # Red dot
@@ -141,7 +187,7 @@ while cap.isOpened():
         status_text = "Activity in progress - Raise ONE finger when done"
         status_color = (0, 165, 255)  # Orange
     elif highest_point_set:
-        status_text = "Raise TWO fingers to start"
+        status_text = "Raise TWO fingers to Start Your Set"
         status_color = (0, 255, 0)  # Green
     else:
         status_text = "Raise ONE finger to set the highest point"
@@ -150,6 +196,32 @@ while cap.isOpened():
     # Display status at the top of the screen
     cv2.putText(frame, status_text, (w//2 - 250, 30), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
+
+    # Display repetition counts on the left side of the screen when activity is in progress
+    if started:
+        # Draw top count
+        cv2.putText(
+            frame,
+            f"TOP: {top_count}",  # Combine label and count
+            (20, 60),  # Position at top-left corner
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 0, 255),
+            2,
+        )  # Adjusted font size and thickness
+
+        # Draw bottom count
+        cv2.putText(
+            frame,
+            f"BOTTOM: {bottom_count}",  # Combine label and count
+            (20, 80),  # Position below top count
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 0, 0),
+            2,
+        )  # Adjusted font size and thickness
+
+
 
     # Detect face
     face_results = face_detection.process(frame_rgb)
@@ -163,22 +235,40 @@ while cap.isOpened():
             x, y, w_box, h_box = int(bboxC.xmin * w), int(bboxC.ymin * h), int(bboxC.width * w), int(bboxC.height * h)
             cv2.rectangle(frame, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
 
+    # Variables for hand distances
+    left_distance = None
+    right_distance = None
+
     # Draw lines between hands and face
     if left_hand_x is not None and face_x is not None:
-        x_distance = abs(left_hand_x - face_x)
+        left_distance = abs(left_hand_x - face_x)
         cv2.line(frame, (left_hand_x, left_hand_y), (face_x, face_y), (0, 255, 0), 2)
-        mid_x = (left_hand_x + face_x) // 2
+        mid_x = (left_hand_x + face_x) // 4
         mid_y = (left_hand_y + face_y) // 2
-        cv2.putText(frame, f"L: {x_distance}px", (mid_x, mid_y - 10), 
+        cv2.putText(frame, f"L: {left_distance}px", (mid_x, mid_y - 100), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
     if right_hand_x is not None and face_x is not None:
-        x_distance = abs(right_hand_x - face_x)
+        right_distance = abs(right_hand_x - face_x)
         cv2.line(frame, (right_hand_x, right_hand_y), (face_x, face_y), (255, 0, 0), 2)
         mid_x = (right_hand_x + face_x) // 2
         mid_y = (right_hand_y + face_y) // 2
-        cv2.putText(frame, f"R: {x_distance}px", (mid_x, mid_y - 10), 
+        cv2.putText(frame, f"R: {right_distance}px", (mid_x, mid_y - 100), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
+
+    # Display warning when hand distances are unbalanced by more than 30 pixels
+    if left_distance is not None and right_distance is not None:
+        difference = abs(left_distance - right_distance)
+        if difference > 30:
+            warning_text = f"UNBALANCED HANDS: {difference}px difference"
+            warning_color = (0, 0, 255)  # Red
+            # Draw the warning at the bottom of the screen
+            # Add a background to make text more visible
+            text_size = cv2.getTextSize(warning_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+            cv2.rectangle(frame, (w//2 - 200 - 10, h - 30 - text_size[1] - 10), 
+                         (w//2 - 200 + text_size[0] + 10, h - 30 + 10), (255, 255, 255), -1)
+            cv2.putText(frame, warning_text, (w//2 - 200, h - 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, warning_color, 2)
 
     # Show the frame
     cv2.imshow("Hand & Face Tracking with X-Distance", frame)
