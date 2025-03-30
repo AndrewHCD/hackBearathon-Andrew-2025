@@ -77,6 +77,11 @@ unbalanced_hands_start = None  # Will store when unbalanced hands were first det
 currently_uneven_height = False  # Flag for tracking current state
 currently_unbalanced_hands = False  # Flag for tracking current state
 
+# Variable to track when the workout was completed
+completion_time = None
+# The delay after completion before stopping recording (in seconds)
+completion_delay = 1.0
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -202,6 +207,8 @@ while cap.isOpened():
     # Step 3: Mark as completed with one finger on both hands
     if started and not completed and left_hand_one_finger and right_hand_one_finger:
         completed = True
+        # Record the time when completed
+        completion_time = current_time
         # Freeze the elapsed time at completion
         if set_start_time is not None:
             elapsed_time = current_time - set_start_time
@@ -217,12 +224,6 @@ while cap.isOpened():
             unbalanced_hands_timer += (current_time - unbalanced_hands_start)
             currently_unbalanced_hands = False
             unbalanced_hands_start = None
-            
-        # Stop video recording when completed
-        if video_writer is not None:
-            video_writer.release()
-            print(f"Recording saved to {video_filename}")
-            video_writer = None
     
     # Count repetitions when activity is in progress and not completed
     if started and not completed and left_hand_x is not None and right_hand_x is not None:
@@ -433,8 +434,8 @@ while cap.isOpened():
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     
     # Display recording status if currently recording
-    if started and not completed and video_writer is not None:
-        recording_text = "● REC"
+    if video_writer is not None:
+        recording_text = "REC"
         cv2.putText(frame, recording_text, (w - 100, 30), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)  # Red dot for recording
 
@@ -518,9 +519,21 @@ while cap.isOpened():
     cv2.imshow("Shoulder Press Analyzer", frame)
     
     # Write frame to video if recording is active
-    if started and not completed and video_writer is not None:
+    if video_writer is not None:
         video_writer.write(frame)
 
+    # Check if we need to stop the recording after delay
+    if completed and completion_time is not None:
+        # Calculate time since completion
+        time_since_completion = current_time - completion_time
+        
+        # If we've waited long enough, stop the recording
+        if time_since_completion >= completion_delay and video_writer is not None:
+            video_writer.release()
+            print(f"Recording saved to {video_filename}")
+            video_writer = None
+            completion_time = None  # Reset to prevent repeated execution
+    
     # Close window when 'q' is pressed or if manually closed
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
